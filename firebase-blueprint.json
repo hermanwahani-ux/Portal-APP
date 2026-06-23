@@ -1,0 +1,80 @@
+{
+  "entities": {
+    "app": {
+      "title": "Aplikasi",
+      "description": "Modul aplikasi yang terdaftar di portal",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "inactive"] },
+        "category": { "type": "string" },
+        "icon": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["id", "name", "url", "status", "category"]
+    },
+    "user": {
+      "title": "Pengguna",
+      "description": "Profil pengguna portal EduDigital",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["Admin", "Editor", "Viewer"] },
+        "status": { "type": "string", "enum": ["active", "suspended"] },
+        "createdAt": { "type": "string" },
+        "avatarUrl": { "type": "string" }
+      },
+      "required": ["id", "name", "email", "role", "status"]
+    },
+    "systemSettings": {
+      "title": "Pengaturan Sistem",
+      "description": "Pengaturan portal sekolah",
+      "type": "object",
+      "properties": {
+        "portalName": { "type": "string" },
+        "schoolYear": { "type": "string" },
+        "contactEmail": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "accentColor": { "type": "string" }
+      },
+      "required": ["portalName", "schoolYear", "contactEmail", "logoUrl", "accentColor"]
+    },
+    "activityLog": {
+      "title": "Log Aktivitas",
+      "description": "Catatan logs riwayat aksi pengguna",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string" },
+        "user": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" },
+        "type": { "type": "string", "enum": ["info", "success", "warn", "error"] }
+      },
+      "required": ["id", "timestamp", "user", "action", "details", "type"]
+    }
+  },
+  "firestore": {
+    "apps": {
+      "schema": "app",
+      "description": "Daftar modul aplikasi portal"
+    },
+    "users": {
+      "schema": "user",
+      "description": "Daftar pengguna portal"
+    },
+    "system": {
+      "schema": "systemSettings",
+      "description": "Pengaturan sistem tunggal"
+    },
+    "logs": {
+      "schema": "activityLog",
+      "description": "Catatan log audit sistem"
+    }
+  }
+}

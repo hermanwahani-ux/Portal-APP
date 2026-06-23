@@ -1,0 +1,126 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isEmailVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function getCurrentUserDoc() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isAdmin() {
+      return isSignedIn() 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && getCurrentUserDoc().data.role == 'Admin';
+    }
+
+    function isEditorOrAdmin() {
+      return isSignedIn() 
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        && (getCurrentUserDoc().data.role == 'Admin' || getCurrentUserDoc().data.role == 'Editor');
+    }
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Entity validations
+    function isValidApp(app) {
+      return app.keys().hasAll(['id', 'name', 'url', 'status', 'category', 'icon', 'createdAt', 'description'])
+        && app.keys().size() == 8
+        && app.id is string && app.id.size() <= 128
+        && app.name is string && app.name.size() > 0 && app.name.size() <= 128
+        && app.description is string && app.description.size() <= 500
+        && app.url is string && app.url.size() > 0 && app.url.size() <= 2083
+        && (app.status == 'active' || app.status == 'inactive')
+        && app.category is string && app.category.size() <= 64
+        && app.icon is string && app.icon.size() <= 64
+        && app.createdAt is string && app.createdAt.size() <= 64;
+    }
+
+    function isValidUser(usr) {
+      return usr.keys().hasAll(['id', 'name', 'email', 'role', 'status', 'createdAt'])
+        && usr.id is string && usr.id.size() <= 128
+        && usr.name is string && usr.name.size() > 0 && usr.name.size() <= 128
+        && usr.email is string && usr.email.size() > 0 && usr.email.size() <= 128
+        && (usr.role == 'Admin' || usr.role == 'Editor' || usr.role == 'Viewer')
+        && (usr.status == 'active' || usr.status == 'suspended')
+        && usr.createdAt is string && usr.createdAt.size() <= 64
+        && (!('avatarUrl' in usr) || (usr.avatarUrl is string && usr.avatarUrl.size() <= 3500000));
+    }
+
+    function isValidSystemSettings(sys) {
+      return sys.keys().hasAll(['portalName', 'schoolYear', 'contactEmail', 'logoUrl', 'accentColor'])
+        && sys.keys().size() == 5
+        && sys.portalName is string && sys.portalName.size() <= 128
+        && sys.schoolYear is string && sys.schoolYear.size() <= 16
+        && sys.contactEmail is string && sys.contactEmail.size() <= 128
+        && sys.logoUrl is string && sys.logoUrl.size() <= 3500000
+        && sys.accentColor is string && sys.accentColor.size() <= 64;
+    }
+
+    function isValidLog(log) {
+      return log.keys().hasAll(['id', 'timestamp', 'user', 'action', 'details', 'type'])
+        && log.keys().size() == 6
+        && log.id is string && log.id.size() <= 128
+        && log.timestamp is string && log.timestamp.size() <= 128
+        && log.user is string && log.user.size() <= 128
+        && log.action is string && log.action.size() <= 128
+        && log.details is string && log.details.size() <= 500
+        && (log.type == 'info' || log.type == 'success' || log.type == 'warn' || log.type == 'error');
+    }
+
+    // Collection: apps
+    match /apps/{appId} {
+      allow get: if isSignedIn();
+      allow list: if (isSignedIn() && resource.data.status == 'active') || isEditorOrAdmin();
+      allow create: if isEditorOrAdmin() && isValidId(appId) && isValidApp(incoming());
+      allow update: if isEditorOrAdmin() && isValidId(appId) && isValidApp(incoming());
+      allow delete: if isEditorOrAdmin() && isValidId(appId);
+    }
+
+    // Collection: users
+    match /users/{userId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if (isAdmin() || request.auth.uid == userId) && isValidId(userId) && isValidUser(incoming());
+      allow update: if (isAdmin() || request.auth.uid == userId) && isValidId(userId) && isValidUser(incoming());
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // Collection: system
+    match /system/{settingsId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() && isValidId(settingsId) && isValidSystemSettings(incoming());
+    }
+
+    // Collection: logs
+    match /logs/{logId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn() && resource.data.user == request.auth.uid || isEditorOrAdmin();
+      allow create: if isSignedIn() && isValidId(logId) && isValidLog(incoming());
+      // Logs are write-once Audit trails; update and delete are forbidden
+      allow update, delete: if false;
+    }
+  }
+}
